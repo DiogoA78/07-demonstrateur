@@ -1,61 +1,63 @@
-# Demonstrateur Data Science
+🇫🇷 [Version française](README_FR.md)
 
-Application Streamlit multi-modules regroupant les demos interactives du portfolio Data Science de Diogo Almeida.
+# Data Science Demonstrator
+
+Multi-module Streamlit application bringing together interactive demos from Diogo Almeida's Data Science portfolio.
 
 ## Modules
 
-| Module | Projet | Description |
-|--------|--------|-------------|
-| Immobilier IDF | P3 | Carte interactive des prix + predicteur ML + stats marche |
-| Anomalies capteurs | P4 | Visualisation capteurs + comparaison 4 methodes de detection |
-| Scoring credit | P5 | Simulateur de credit + SHAP waterfall + analyse biais Fairlearn |
-| Sentiment NLP | P6 | Baseline TF-IDF vs CamemBERT sur critiques de films francais |
+| Module | Project | Description |
+|--------|---------|-------------|
+| Real Estate IDF | P3 | Interactive price map + ML predictor + market stats |
+| Sensor Anomalies | P4 | Sensor visualization + comparison of 4 detection methods |
+| Credit Scoring | P5 | Credit simulator + SHAP waterfall + Fairlearn bias analysis |
+| Sentiment NLP | P6 | TF-IDF baseline vs CamemBERT on French movie reviews |
 
 ## Installation
 
 ```bash
-# Cloner le repo
+# Clone the repo
 git clone https://github.com/DiogoA78/07-demonstrateur.git
 cd 07-demonstrateur
 
-# Creer l'environnement virtuel
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# ou : venv\Scripts\activate  # Windows
+# or: venv\Scripts\activate  # Windows
 
-# Installer les dependances
+# Install dependencies
 pip install -r requirements.txt
 
-# Lancer l'application
+# Launch the application
 streamlit run app.py
 ```
 
-## Mode demonstration
+## Demo Mode
 
-L'application fonctionne en **mode demo** sans modeles entraines : les predictions sont simulees a partir d'heuristiques realistes. Pour activer les vrais modeles, placez les fichiers `.pkl` issus des notebooks dans le dossier `models/`.
+The application runs in **demo mode** without trained models: predictions are simulated using realistic heuristics. To activate the real models, place the `.pkl` files generated from the notebooks into the `models/` folder.
 
-### Fichiers modeles attendus
+### Expected Model Files
 
-| Module | Fichiers | Source |
-|--------|----------|--------|
-| Immobilier | `immobilier_model.pkl` | Notebook P3 |
-| Anomalies | (donnees integrees) | Notebook P4 |
+| Module | Files | Source |
+|--------|-------|--------|
+| Real Estate | `immobilier_model.pkl` | Notebook P3 |
+| Anomalies | (data built-in) | Notebook P4 |
 | Credit | `credit_logistic.pkl`, `credit_random_forest.pkl`, `credit_xgboost.pkl`, `credit_lightgbm.pkl` | Notebook P5 |
 | Sentiment | `tfidf_vectorizer.pkl`, `baseline_model.pkl`, `camembert_sentiment/` | Notebook P6 |
 
-## Stack technique
+## Tech Stack
 
-- **Frontend** : Streamlit
-- **Visualisation** : Plotly
-- **ML** : scikit-learn, XGBoost, LightGBM, Transformers (CamemBERT)
-- **Equite** : Fairlearn (analyse de biais)
+- **Frontend**: Streamlit
+- **Visualization**: Plotly
+- **ML**: scikit-learn, XGBoost, LightGBM, Transformers (CamemBERT)
+- **Fairness**: Fairlearn (bias analysis)
 
-## Deploiement
+## Deployment
 
-> [🔗 Voir l'app sur Streamlit Cloud](https://diogoa78-07-demonstrateur-hsrfdt8xqoiobofkvqmaqd.streamlit.app/)
+> [🔗 View the app on Streamlit Cloud](https://diogoa78-07-demonstrateur-hsrfdt8xqoiobofkvqmaqd.streamlit.app/)
 
-## Auteur
+## Author
 
-**Diogo Almeida** - Data Scientist
+**Diogo Almeida** — Data Scientist
 - [GitHub](https://github.com/DiogoA78)
 - [LinkedIn](https://linkedin.com/in/diogo-almeida0)
