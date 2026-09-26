@@ -1,0 +1,28 @@
+# Données et modèles
+models/*.pkl
+models/*.h5
+models/camembert_sentiment/
+data/*.csv
+data/*.parquet
+data/raw/
+data/processed/
+
+# Environnement
+.env
+.env.*
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Notebooks
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
