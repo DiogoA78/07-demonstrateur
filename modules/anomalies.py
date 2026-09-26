@@ -16,6 +16,7 @@ import joblib
 import os
 
 from utils.style import module_header, metric_card, separator, info_box, PLOT_COLORS
+from utils.translations import get_text
 
 MODELS_DIR = "models"
 DATA_PATH = os.path.join("data", "anomalies_sample.csv")
@@ -77,7 +78,7 @@ def generate_demo_data():
     anomaly_true[other_idx] = 1
     anomaly_category[other_idx] = "other"
 
-    # Prédictions simulées des 4 méthodes (avec des profils de performance distincts)
+    # Prédictions simulées des 4 méthodes
     pred_if = anomaly_true.copy()
     pred_lof = anomaly_true.copy()
     pred_ocsvm = anomaly_true.copy()
@@ -134,33 +135,31 @@ def compute_metrics(y_true, y_pred):
     return {"precision": precision, "recall": recall, "f1": f1, "tp": tp, "fp": fp, "fn": fn}
 
 
-def render():
+def render(lang="fr"):
     """Point d'entrée du module Anomalies capteurs."""
-    module_header(
-        "📡",
-        "Anomalies capteurs industriels",
-        "Détection d'anomalies sur données de capteurs — comparaison de 4 méthodes"
-    )
+    T = get_text("anomalies", lang)
+
+    module_header("📡", T["header_title"], T["header_desc"])
 
     df = load_data()
 
     tab1, tab2, tab3 = st.tabs([
-        "📈 Visualisation capteurs",
-        "🔍 Comparaison méthodes",
-        "📊 Métriques de performance"
+        T["tab_sensors"],
+        T["tab_comparison"],
+        T["tab_metrics"],
     ])
 
     with tab1:
-        render_sensors(df)
+        render_sensors(df, T)
     with tab2:
-        render_comparison(df)
+        render_comparison(df, T)
     with tab3:
-        render_metrics(df)
+        render_metrics(df, T)
 
 
-def render_sensors(df):
+def render_sensors(df, T):
     """Visualisation des séries temporelles avec anomalies colorées."""
-    st.subheader("Séries temporelles des capteurs")
+    st.subheader(T["sensors_title"])
 
     # Métriques
     n_anomalies = int(df["anomaly_true"].sum())
@@ -169,36 +168,36 @@ def render_sensors(df):
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        metric_card("Points de mesure", f"{n_total:,}".replace(",", " "))
+        metric_card(T["metric_datapoints"], f"{n_total:,}".replace(",", " "))
     with col2:
-        metric_card("Anomalies détectées", f"{n_anomalies}")
+        metric_card(T["metric_anomalies"], f"{n_anomalies}")
     with col3:
-        metric_card("Taux d'anomalies", f"{pct_anomalies:.1f}%")
+        metric_card(T["metric_anomaly_rate"], f"{pct_anomalies:.1f}%")
     with col4:
         categories = df[df["anomaly_true"] == 1]["anomaly_category"].nunique()
-        metric_card("Types d'anomalies", f"{categories}")
+        metric_card(T["metric_anomaly_types"], f"{categories}")
 
     st.markdown("")
 
     # Filtre par catégorie
-    categories_list = ["Toutes"] + sorted(df[df["anomaly_category"] != "normal"]["anomaly_category"].unique().tolist())
-    cat_filter = st.selectbox("Filtrer par catégorie d'anomalie", categories_list)
+    categories_list = [T["filter_all"]] + sorted(df[df["anomaly_category"] != "normal"]["anomaly_category"].unique().tolist())
+    cat_filter = st.selectbox(T["filter_label"], categories_list)
 
     # Sélection du capteur
     sensors = {
-        "sensor1_temperature": "Capteur 1 — Température (°C)",
-        "sensor2_pressure": "Capteur 2 — Pression (bar)",
-        "sensor3_vibration": "Capteur 3 — Vibration (mm/s)",
+        "sensor1_temperature": T["sensor1"],
+        "sensor2_pressure": T["sensor2"],
+        "sensor3_vibration": T["sensor3"],
     }
     sensor_key = st.selectbox(
-        "Capteur",
+        T["sensor_label"],
         list(sensors.keys()),
         format_func=lambda x: sensors[x],
     )
 
     # Préparer les données
     df_plot = df.copy()
-    if cat_filter != "Toutes":
+    if cat_filter != T["filter_all"]:
         mask_anomaly = (df_plot["anomaly_category"] == cat_filter)
     else:
         mask_anomaly = df_plot["anomaly_true"] == 1
@@ -210,7 +209,7 @@ def render_sensors(df):
     fig.add_trace(go.Scatter(
         x=df_plot["timestamp"], y=df_plot[sensor_key],
         mode="lines",
-        name="Signal normal",
+        name=T["legend_normal"],
         line=dict(color=PLOT_COLORS[0], width=1),
         opacity=0.7,
     ))
@@ -224,7 +223,7 @@ def render_sensors(df):
             fig.add_trace(go.Scatter(
                 x=df_cat["timestamp"], y=df_cat[sensor_key],
                 mode="markers",
-                name=f"Anomalie — {cat}",
+                name=T["legend_anomaly"].format(cat=cat),
                 marker=dict(
                     color=color_map.get(cat, PLOT_COLORS[1]),
                     size=8,
@@ -253,7 +252,7 @@ def render_sensors(df):
         fig_pie = px.pie(
             values=cat_counts.values,
             names=cat_counts.index,
-            title="Répartition par type d'anomalie",
+            title=T["chart_pie_title"],
             color_discrete_sequence=PLOT_COLORS[1:],
         )
         fig_pie.update_layout(
@@ -263,14 +262,13 @@ def render_sensors(df):
         st.plotly_chart(fig_pie, width="stretch")
 
     with col2:
-        # Timeline des anomalies
         df_anom_all = df[df["anomaly_true"] == 1].copy()
         df_anom_all["hour"] = df_anom_all["timestamp"].dt.hour if hasattr(df_anom_all["timestamp"].dt, "hour") else pd.to_datetime(df_anom_all["timestamp"]).dt.hour
         hour_counts = df_anom_all["hour"].value_counts().sort_index()
         fig_bar = px.bar(
             x=hour_counts.index, y=hour_counts.values,
-            title="Anomalies par heure de la journée",
-            labels={"x": "Heure", "y": "Nombre d'anomalies"},
+            title=T["chart_hour_title"],
+            labels={"x": T["axis_hour"], "y": T["axis_num_anomalies"]},
             color_discrete_sequence=[PLOT_COLORS[1]],
         )
         fig_bar.update_layout(
@@ -281,16 +279,11 @@ def render_sensors(df):
         st.plotly_chart(fig_bar, width="stretch")
 
 
-def render_comparison(df):
+def render_comparison(df, T):
     """Comparaison côte à côte des 4 méthodes de détection."""
-    st.subheader("Comparaison des méthodes de détection")
+    st.subheader(T["comparison_title"])
 
-    info_box(
-        "Chaque graphique montre la même série temporelle avec les anomalies détectées "
-        "par chaque méthode. Les <strong>faux positifs</strong> (détections incorrectes) "
-        "sont en <span style='color:#FFD740'>jaune</span>, les <strong>vrais positifs</strong> "
-        "en <span style='color:#FF5252'>rouge</span>."
-    )
+    info_box(T["comparison_info"])
 
     sensor_key = "sensor1_temperature"
 
@@ -311,7 +304,7 @@ def render_comparison(df):
             line=dict(color=PLOT_COLORS[0], width=0.8),
             opacity=0.5,
             showlegend=(i == 1),
-            name="Signal",
+            name=T["legend_signal"],
         ), row=i, col=1)
 
         # Vrais positifs
@@ -321,7 +314,7 @@ def render_comparison(df):
             mode="markers",
             marker=dict(color=PLOT_COLORS[1], size=5, symbol="circle"),
             showlegend=(i == 1),
-            name="Vrai positif",
+            name=T["legend_true_pos"],
         ), row=i, col=1)
 
         # Faux positifs
@@ -331,7 +324,7 @@ def render_comparison(df):
             mode="markers",
             marker=dict(color=PLOT_COLORS[3], size=5, symbol="diamond"),
             showlegend=(i == 1),
-            name="Faux positif",
+            name=T["legend_false_pos"],
         ), row=i, col=1)
 
         # Faux négatifs
@@ -341,7 +334,7 @@ def render_comparison(df):
             mode="markers",
             marker=dict(color=PLOT_COLORS[2], size=5, symbol="triangle-up"),
             showlegend=(i == 1),
-            name="Faux négatif (raté)",
+            name=T["legend_false_neg"],
         ), row=i, col=1)
 
     fig.update_layout(
@@ -354,9 +347,9 @@ def render_comparison(df):
     st.plotly_chart(fig, width="stretch")
 
 
-def render_metrics(df):
+def render_metrics(df, T):
     """Tableau comparatif des métriques de performance."""
-    st.subheader("Métriques de performance")
+    st.subheader(T["metrics_title"])
 
     methods = ["pred_isolation_forest", "pred_lof", "pred_ocsvm", "pred_autoencoder"]
     y_true = df["anomaly_true"].values
@@ -413,17 +406,17 @@ def render_metrics(df):
         ),
         template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
-        title="Comparaison Radar — Precision / Recall / F1",
+        title=T["radar_title"],
         height=500,
     )
     st.plotly_chart(fig, width="stretch")
 
     # Tableau détaillé
     separator()
-    st.subheader("Tableau détaillé")
+    st.subheader(T["table_title"])
 
     df_display = df_metrics[["method", "precision", "recall", "f1", "tp", "fp", "fn"]].copy()
-    df_display.columns = ["Méthode", "Precision", "Recall", "F1-Score", "Vrais Positifs", "Faux Positifs", "Faux Négatifs"]
+    df_display.columns = [T["col_method"], "Precision", "Recall", "F1-Score", T["col_tp"], T["col_fp"], T["col_fn"]]
     df_display["Precision"] = df_display["Precision"].apply(lambda x: f"{x:.3f}")
     df_display["Recall"] = df_display["Recall"].apply(lambda x: f"{x:.3f}")
     df_display["F1-Score"] = df_display["F1-Score"].apply(lambda x: f"{x:.3f}")
@@ -432,7 +425,7 @@ def render_metrics(df):
 
     # Matrice de confusion par méthode
     separator()
-    st.subheader("Matrices de confusion")
+    st.subheader(T["confusion_title"])
 
     cols = st.columns(4)
     for i, method in enumerate(methods):
@@ -444,14 +437,8 @@ def render_metrics(df):
         with cols[i]:
             st.markdown(f"**{name}**")
             conf_df = pd.DataFrame(
-                [[tn, m["fp"]], [m["fn"], m["tp"]]],
-                index=["Prédit Normal", "Prédit Anomalie"],
-                columns=["Vrai Normal", "Vrai Anomalie"],
-            )
-            # Correction : inversion pour l'affichage standard
-            conf_df = pd.DataFrame(
                 [[m["tp"], m["fn"]], [m["fp"], tn]],
-                index=["Prédit Anomalie", "Prédit Normal"],
-                columns=["Vrai Anomalie", "Vrai Normal"],
+                index=[T["pred_anomaly"], T["pred_normal"]],
+                columns=[T["true_anomaly"], T["true_normal"]],
             )
             st.dataframe(conf_df, width="stretch")

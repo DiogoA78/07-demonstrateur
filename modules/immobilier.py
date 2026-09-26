@@ -6,18 +6,18 @@ Module Immobilier IDF — Projet 3
 - Onglet 3 : Statistiques du marché
 """
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-import folium
-from folium.plugins import MarkerCluster
-from streamlit_folium import st_folium
-import joblib
 import os
 
-from utils.style import module_header, metric_card, separator, info_box, PLOT_COLORS
+import folium
+import joblib
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+from streamlit_folium import st_folium
+
+from utils.style import PLOT_COLORS, metric_card, module_header, separator
+from utils.translations import get_text
 
 MODEL_PATH = os.path.join("models", "immobilier_model.pkl")
 DATA_PATH = os.path.join("data", "immobilier_sample.csv")
@@ -78,78 +78,86 @@ def generate_demo_data():
             prix_m2 = prix_m2_base * np.random.uniform(0.85, 1.15)
             prix = surface * prix_m2
 
-            rows.append({
-                "commune": commune,
-                "latitude": lat + np.random.uniform(-0.005, 0.005),
-                "longitude": lon + np.random.uniform(-0.005, 0.005),
-                "surface": surface,
-                "nb_pieces": nb_pieces,
-                "etage": etage,
-                "annee_construction": annee_construction,
-                "prix_m2": round(prix_m2),
-                "prix": round(prix),
-            })
+            rows.append(
+                {
+                    "commune": commune,
+                    "latitude": lat + np.random.uniform(-0.005, 0.005),
+                    "longitude": lon + np.random.uniform(-0.005, 0.005),
+                    "surface": surface,
+                    "nb_pieces": nb_pieces,
+                    "etage": etage,
+                    "annee_construction": annee_construction,
+                    "prix_m2": round(prix_m2),
+                    "prix": round(prix),
+                }
+            )
 
     return pd.DataFrame(rows)
 
 
-def render():
+def render(lang="fr"):
     """Point d'entrée du module Immobilier IDF."""
-    module_header(
-        "🏘️",
-        "Immobilier Île-de-France",
-        "Exploration des prix immobiliers et prédiction par Machine Learning"
-    )
+    T = get_text("immobilier", lang)
+
+    module_header("🏘️", T["header_title"], T["header_desc"])
 
     # Charger les données
     df = load_data()
     model = load_model()
 
     # Onglets
-    tab1, tab2, tab3 = st.tabs([
-        "🗺️ Carte des prix",
-        "🔮 Prédicteur de prix",
-        "📊 Statistiques marché"
-    ])
+    tab1, tab2, tab3 = st.tabs(
+        [
+            T["tab_map"],
+            T["tab_predictor"],
+            T["tab_stats"],
+        ]
+    )
 
-    # --- Onglet 1 : Carte interactive ---
     with tab1:
-        render_map(df)
+        render_map(df, T)
 
-    # --- Onglet 2 : Prédicteur ---
     with tab2:
-        render_predictor(df, model)
+        render_predictor(df, model, T)
 
-    # --- Onglet 3 : Statistiques ---
     with tab3:
-        render_stats(df)
+        render_stats(df, T)
 
 
-def render_map(df):
+def render_map(df, T):
     """Carte interactive des prix médians par commune."""
-    st.subheader("Prix médians par commune")
+    st.subheader(T["map_title"])
 
     # Agréger par commune
-    agg = df.groupby("commune").agg(
-        prix_m2_median=("prix_m2", "median"),
-        prix_median=("prix", "median"),
-        nb_transactions=("prix", "count"),
-        latitude=("latitude", "mean"),
-        longitude=("longitude", "mean"),
-    ).reset_index()
+    agg = (
+        df.groupby("commune")
+        .agg(
+            prix_m2_median=("prix_m2", "median"),
+            prix_median=("prix", "median"),
+            nb_transactions=("prix", "count"),
+            latitude=("latitude", "mean"),
+            longitude=("longitude", "mean"),
+        )
+        .reset_index()
+    )
 
     # Métriques globales
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        metric_card("Communes analysées", f"{len(agg)}")
+        metric_card(T["metric_communes"], f"{len(agg)}")
     with col2:
-        metric_card("Prix médian / m²", f"{int(agg['prix_m2_median'].median()):,} €".replace(",", " "))
+        metric_card(
+            T["metric_median_m2"],
+            f"{int(agg['prix_m2_median'].median()):,} €".replace(",", " "),
+        )
     with col3:
-        metric_card("Transactions", f"{len(df):,}".replace(",", " "))
+        metric_card(T["metric_transactions"], f"{len(df):,}".replace(",", " "))
     with col4:
         metric_card(
-            "Écart min-max",
-            f"{int(agg['prix_m2_median'].min()):,} - {int(agg['prix_m2_median'].max()):,} €/m²".replace(",", " ")
+            T["metric_spread"],
+            f"{int(agg['prix_m2_median'].min()):,} - {int(agg['prix_m2_median'].max()):,} €/m²".replace(
+                ",", " "
+            ),
         )
 
     st.markdown("")
@@ -169,7 +177,9 @@ def render_map(df):
     prix_max = agg["prix_m2_median"].max()
 
     def get_color(prix):
-        ratio = (prix - prix_min) / (prix_max - prix_min) if prix_max > prix_min else 0.5
+        ratio = (
+            (prix - prix_min) / (prix_max - prix_min) if prix_max > prix_min else 0.5
+        )
         r = int(255 * ratio)
         g = int(255 * (1 - ratio))
         return f"#{r:02x}{g:02x}40"
@@ -180,10 +190,10 @@ def render_map(df):
 
         popup_html = f"""
         <div style="font-family: sans-serif; font-size: 13px; min-width: 180px;">
-            <b>{row['commune']}</b><br>
-            Prix médian / m² : <b>{int(row['prix_m2_median']):,} €</b><br>
-            Prix médian : <b>{int(row['prix_median']):,} €</b><br>
-            Transactions : {int(row['nb_transactions'])}
+            <b>{row["commune"]}</b><br>
+            {T["popup_median_m2"]} : <b>{int(row["prix_m2_median"]):,} €</b><br>
+            {T["popup_median_price"]} : <b>{int(row["prix_median"]):,} €</b><br>
+            {T["popup_transactions"]} : {int(row["nb_transactions"])}
         </div>
         """.replace(",", " ")
 
@@ -195,67 +205,72 @@ def render_map(df):
             fill_color=color,
             fill_opacity=0.7,
             popup=folium.Popup(popup_html, max_width=250),
-            tooltip=f"{row['commune']} — {int(row['prix_m2_median']):,} €/m²".replace(",", " "),
+            tooltip=f"{row['commune']} — {int(row['prix_m2_median']):,} €/m²".replace(
+                ",", " "
+            ),
         ).add_to(m)
 
     st_folium(m, width="100%", height=550, returned_objects=[])
 
     # Classement
     separator()
-    st.subheader("Classement des communes")
+    st.subheader(T["ranking_title"])
 
     sort_order = st.radio(
-        "Trier par prix au m²",
-        ["Plus cher d'abord", "Moins cher d'abord"],
+        T["sort_label"],
+        [T["sort_expensive"], T["sort_cheapest"]],
         horizontal=True,
     )
-    ascending = sort_order == "Moins cher d'abord"
+    ascending = sort_order == T["sort_cheapest"]
     ranking = agg.sort_values("prix_m2_median", ascending=ascending)[
         ["commune", "prix_m2_median", "prix_median", "nb_transactions"]
     ].reset_index(drop=True)
     ranking.index += 1
-    ranking.columns = ["Commune", "Prix médian / m² (€)", "Prix médian (€)", "Transactions"]
+    ranking.columns = [
+        T["col_commune"],
+        T["col_median_m2"],
+        T["col_median_price"],
+        T["col_transactions"],
+    ]
 
     st.dataframe(ranking, width="stretch", height=400)
 
 
-def render_predictor(df, model):
+def render_predictor(df, model, T):
     """Formulaire de prédiction de prix."""
-    st.subheader("Estimer le prix d'un bien")
+    st.subheader(T["predictor_title"])
 
     communes = sorted(df["commune"].unique())
-
-    if model is None:
-        info_box(
-            "⚠️ <strong>Mode démonstration</strong> — Le modèle entraîné n'est pas chargé. "
-            "L'estimation utilise les statistiques du dataset. "
-            "Pour activer le vrai modèle, placez le fichier <code>immobilier_model.pkl</code> "
-            "dans le dossier <code>models/</code>."
-        )
 
     col1, col2 = st.columns(2)
 
     with col1:
-        commune = st.selectbox("Commune", communes, index=communes.index("Paris 6e") if "Paris 6e" in communes else 0)
-        surface = st.slider("Surface (m²)", 10, 250, 65)
-        nb_pieces = st.slider("Nombre de pièces", 1, 8, 3)
+        commune = st.selectbox(
+            T["label_commune"],
+            communes,
+            index=communes.index("Paris 6e") if "Paris 6e" in communes else 0,
+        )
+        surface = st.slider(T["label_surface"], 10, 250, 65)
+        nb_pieces = st.slider(T["label_rooms"], 1, 8, 3)
 
     with col2:
-        etage = st.slider("Étage", 0, 15, 3)
-        annee_construction = st.slider("Année de construction", 1800, 2025, 1970)
+        etage = st.slider(T["label_floor"], 0, 15, 3)
+        annee_construction = st.slider(T["label_year"], 1800, 2025, 1970)
 
     separator()
 
-    if st.button("🔮 Estimer le prix", type="primary", width="stretch"):
+    if st.button(T["btn_estimate"], type="primary", width="stretch"):
         if model is not None:
-            # Prédiction avec le vrai modèle
-            features = pd.DataFrame([{
-                "surface": surface,
-                "nb_pieces": nb_pieces,
-                "etage": etage,
-                "annee_construction": annee_construction,
-            }])
-            # Ajouter l'encodage de la commune si nécessaire
+            features = pd.DataFrame(
+                [
+                    {
+                        "surface": surface,
+                        "nb_pieces": nb_pieces,
+                        "etage": etage,
+                        "annee_construction": annee_construction,
+                    }
+                ]
+            )
             try:
                 prediction = model.predict(features)[0]
             except Exception:
@@ -268,17 +283,19 @@ def render_predictor(df, model):
         st.markdown("")
         col1, col2, col3 = st.columns(3)
         with col1:
-            metric_card("Prix estimé", f"{int(prediction):,} €".replace(",", " "))
+            metric_card(T["result_price"], f"{int(prediction):,} €".replace(",", " "))
         with col2:
-            metric_card("Prix au m²", f"{int(prix_m2):,} €/m²".replace(",", " "))
+            metric_card(T["result_m2"], f"{int(prix_m2):,} €/m²".replace(",", " "))
         with col3:
             commune_median = df[df["commune"] == commune]["prix_m2"].median()
             diff_pct = ((prix_m2 - commune_median) / commune_median) * 100
             delta_type = "negative" if diff_pct > 0 else "positive"
             metric_card(
-                "vs. médiane commune",
+                T["result_vs_median"],
                 f"{diff_pct:+.1f}%",
-                delta=f"Médiane : {int(commune_median):,} €/m²".replace(",", " "),
+                delta=T["result_median_label"].format(
+                    value=f"{int(commune_median):,}".replace(",", " ")
+                ),
                 delta_type=delta_type,
             )
 
@@ -286,13 +303,21 @@ def render_predictor(df, model):
         st.markdown("")
         commune_data = df[df["commune"] == commune]
         fig = px.histogram(
-            commune_data, x="prix_m2", nbins=20,
-            title=f"Distribution des prix au m² — {commune}",
-            labels={"prix_m2": "Prix / m² (€)", "count": "Nombre de biens"},
+            commune_data,
+            x="prix_m2",
+            nbins=20,
+            title=T["chart_distribution"].format(commune=commune),
+            labels={"prix_m2": T["axis_price_m2"], "count": T["axis_num_properties"]},
             color_discrete_sequence=[PLOT_COLORS[0]],
         )
-        fig.add_vline(x=prix_m2, line_dash="dash", line_color=PLOT_COLORS[1],
-                      annotation_text=f"Votre estimation : {int(prix_m2):,} €/m²")
+        fig.add_vline(
+            x=prix_m2,
+            line_dash="dash",
+            line_color=PLOT_COLORS[1],
+            annotation_text=T["annotation_estimate"].format(
+                value=f"{int(prix_m2):,}".replace(",", " ")
+            ),
+        )
         fig.update_layout(
             template="plotly_dark",
             paper_bgcolor="rgba(0,0,0,0)",
@@ -311,18 +336,20 @@ def _estimate_from_data(df, commune, surface):
     return prix_m2 * surface
 
 
-def render_stats(df):
+def render_stats(df, T):
     """Statistiques du marché immobilier."""
-    st.subheader("Vue d'ensemble du marché")
+    st.subheader(T["stats_title"])
 
     # Métriques globales
     col1, col2, col3 = st.columns(3)
     with col1:
-        metric_card("Surface moyenne", f"{df['surface'].mean():.0f} m²")
+        metric_card(T["metric_avg_surface"], f"{df['surface'].mean():.0f} m²")
     with col2:
-        metric_card("Prix moyen", f"{int(df['prix'].mean()):,} €".replace(",", " "))
+        metric_card(
+            T["metric_avg_price"], f"{int(df['prix'].mean()):,} €".replace(",", " ")
+        )
     with col3:
-        metric_card("Pièces (moyenne)", f"{df['nb_pieces'].mean():.1f}")
+        metric_card(T["metric_avg_rooms"], f"{df['nb_pieces'].mean():.1f}")
 
     separator()
 
@@ -331,9 +358,11 @@ def render_stats(df):
     df_top = df[df["commune"].isin(top_communes)]
 
     fig1 = px.box(
-        df_top, x="commune", y="prix_m2",
-        title="Distribution des prix au m² — Top 15 communes",
-        labels={"commune": "", "prix_m2": "Prix / m² (€)"},
+        df_top,
+        x="commune",
+        y="prix_m2",
+        title=T["chart_box_top15"],
+        labels={"commune": "", "prix_m2": T["axis_price_m2"]},
         color_discrete_sequence=[PLOT_COLORS[0]],
     )
     fig1.update_layout(
@@ -346,10 +375,12 @@ def render_stats(df):
 
     # Surface vs Prix (scatter)
     fig2 = px.scatter(
-        df, x="surface", y="prix",
+        df,
+        x="surface",
+        y="prix",
         color="commune",
-        title="Surface vs. Prix de vente",
-        labels={"surface": "Surface (m²)", "prix": "Prix (€)"},
+        title=T["chart_scatter_title"],
+        labels={"surface": T["axis_surface"], "prix": T["axis_price"]},
         opacity=0.6,
         hover_data=["commune", "nb_pieces", "prix_m2"],
     )
@@ -366,9 +397,10 @@ def render_stats(df):
     with col1:
         pieces_count = df["nb_pieces"].value_counts().sort_index()
         fig3 = px.bar(
-            x=pieces_count.index, y=pieces_count.values,
-            title="Répartition par nombre de pièces",
-            labels={"x": "Nombre de pièces", "y": "Nombre de biens"},
+            x=pieces_count.index,
+            y=pieces_count.values,
+            title=T["chart_rooms_dist"],
+            labels={"x": T["axis_rooms"], "y": T["axis_num_props"]},
             color_discrete_sequence=[PLOT_COLORS[2]],
         )
         fig3.update_layout(
@@ -380,9 +412,14 @@ def render_stats(df):
 
     with col2:
         fig4 = px.scatter(
-            df, x="annee_construction", y="prix_m2",
-            title="Année de construction vs. Prix / m²",
-            labels={"annee_construction": "Année", "prix_m2": "Prix / m² (€)"},
+            df,
+            x="annee_construction",
+            y="prix_m2",
+            title=T["chart_year_price"],
+            labels={
+                "annee_construction": T["axis_year"],
+                "prix_m2": T["axis_price_m2"],
+            },
             opacity=0.5,
             color_discrete_sequence=[PLOT_COLORS[4]],
         )
